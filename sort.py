@@ -3,6 +3,8 @@ import shutil
 import datetime
 import cv2
 from multiprocessing import Pool
+from PIL import Image
+from functools import partial
     
 def main():
     while True:
@@ -18,12 +20,38 @@ def main():
         for file in files:
             images.append(os.path.join(root, file))
 
-    with Pool() as pool:
-        multiprocess_pool = pool.map(multi_cv2_bad_files, images)
-    good_list = [i for output in multiprocess_pool for i in output[0]]
-    bad_list = [j for output in multiprocess_pool for j in output[1]]
+    # with Pool() as pool:
+    #     multiprocess_pool = pool.map(multi_cv2_bad_files, images)
+    # good_list = [i for output in multiprocess_pool for i in output[0]]
+    # bad_list = [j for output in multiprocess_pool for j in output[1]]
 
-    find_bad_files(good_list, bad_list)
+    #find_bad_files(good_list, bad_list)
+    print()
+    while True:
+        dest_dir = input('Please input a directory to store the sorted images: ')
+        if not os.path.isdir(dest_dir):
+            print('Directory is invalid.')
+            continue
+        break
+    print()
+    print('Creating directories and sorting the files.')
+    print()
+    with Pool() as pool:
+        func = partial(create_directories_and_move, dest_dir=dest_dir)
+        pool.map(func, images)
+    print(f'Done! All of the sorted images can be found in {dest_dir}.')
+
+def create_directories_and_move(file, dest_dir: str):
+    img_exif_datetimeoriginal = Image.open(file).getexif().get(36867)
+    if img_exif_datetimeoriginal is not None:
+        month = '{:02d}'.format(datetime.datetime.strptime(img_exif_datetimeoriginal, '%Y:%m:%d %H:%M:%S').month)
+        year = '{:02d}'.format(datetime.datetime.strptime(img_exif_datetimeoriginal, '%Y:%m:%d %H:%M:%S').year)
+    else:
+        month = '{:02d}'.format(datetime.datetime.fromtimestamp(os.path.getmtime(file)).month)
+        year = '{:02d}'.format(datetime.datetime.fromtimestamp(os.path.getmtime(file)).year)
+    if not os.path.exists(os.path.join(dest_dir, year, month)):
+        os.makedirs(os.path.join(dest_dir, year, month))
+    shutil.move(file, os.path.join(dest_dir, year, month))
 
 def multi_cv2_bad_files(file):
     good_files = []
